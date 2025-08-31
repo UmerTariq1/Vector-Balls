@@ -4,7 +4,7 @@ A fast-paced, real-time 2D physics-based survival game built with Python and Pyg
 
 ## 🎮 Game Description
 
-<img src="imgs/game.png" alt="Game Screenshot" width="100%" style="max-width: 600px;">
+<img src="imgs/game.png" alt="Game Screenshot" width="75%" style="max-width: 600px;">
 
 Vector Balls is a competitive physics simulation where players control colored balls that move within a circular arena. The objective is to be the last ball remaining by strategically removing other balls' lines while protecting your own.
 
@@ -151,7 +151,7 @@ The game offers extensive customization through the setup screen:
 
 At the end of each game, view comprehensive statistics on a clean, separate screen:
 
-<img src="imgs/stats.png" alt="Stats Screen" width="100%" style="max-width: 600px;">
+<img src="imgs/stats.png" alt="Stats Screen" width="75%" style="max-width: 600px;">
 
 ### Rankings System
 - **🏆 1st Place**: Winner with trophy emoji and gold color
