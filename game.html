@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Balls</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #0d0d0d;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center; /* Center vertically for better mobile layout */
+            padding: 10px;
+            background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
+        }
+        canvas {
+            display: block;
+            background-color: #000;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+            max-width: 95vw;
+            max-height: 95vh;
+        }
+
+        /* Mobile-specific canvas styling */
+        @media (max-width: 768px) or (max-height: 600px) {
+            canvas {
+                border-radius: 12px;
+                box-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
+            }
+
+            #game-container {
+                padding: 5px;
+            }
+        }
+        .ui-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95));
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            color: #f0f0f0;
+            text-align: center;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 1000;
+            min-width: 320px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            .ui-panel {
+                min-width: 280px;
+                padding: 1rem;
+            }
+        }
+        .input-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        input[type="range"] {
+            width: 50%;
+            -webkit-appearance: none;
+            background: #444;
+            height: 5px;
+            border-radius: 5px;
+            outline: none;
+            transition: opacity .2s;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+    <body class="bg-gray-900 text-white overflow-hidden">
+        <div id="game-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+    <script>
+        // ============================================
+        // VECTOR BALLS GAME - MAIN JAVASCRIPT
+        // ============================================
+        // A real-time physics-based game where balls compete
+        // by removing each other's lines in a circular arena.
+
+        // ============================================
+        // GAME STATE MANAGEMENT
+        // ============================================
+        const State = {
+            SETUP: 'setup',
+            GAMEPLAY: 'gameplay',
+            STATS: 'stats'
+        };
+        let gameState = State.SETUP;
+
+        // ============================================
+        // GAME CONFIGURATION & CONSTANTS
+        // ============================================
+
+        // Ball color palette - used for visual distinction
+        const BALL_COLORS = [
+            '#FF6347', '#46E891', '#8A2BE2', '#F0E68C', '#FFA500', '#B0C4DE',
+            '#00CED1', '#FF69B4', '#DA70D6', '#FFD700', '#ADFF2F', '#483D8B'
+        ];
+
+        let config = {
+            ballCount: 6,
+            linesPerHit: 3,
+            initialSpeed: 100,
+            collisionSpeedFactor: 0.12,
+            boundarySpeedIncrease: 25.0,
+            boundaryRadiusRatio: 0.8,
+            peacefulTimeDuration: 1.0
+        };
+
+        // Game constants - now configurable
+        let GRACE_PERIOD_DURATION = config.peacefulTimeDuration;
+
+        // ============================================
+        // CANVAS & RENDERING SETUP
+        // ============================================
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Calculate canvas size dynamically based on screen orientation and size
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const isMobile = viewportWidth < 768 || viewportHeight > viewportWidth; // Mobile or portrait mode
+
+        let canvasWidth, canvasHeight;
+
+        if (isMobile) {
+            // Mobile/Portrait: Use available space efficiently for vertical screens
+            canvasWidth = Math.min(viewportWidth * 0.95, 600); // Allow wider canvas on mobile
+            canvasHeight = Math.min(viewportHeight * 0.85, canvasWidth * 1.5); // Use up to 85% of height, allow taller aspect ratio
+
+            // Ensure minimum playable size
+            const minSize = 300;
+            canvasWidth = Math.max(canvasWidth, minSize);
+            canvasHeight = Math.max(canvasHeight, minSize);
+        } else {
+            // Desktop/Landscape: Use balanced approach
+            const size = Math.min(viewportWidth * 0.8, viewportHeight * 0.85, 900);
+            canvasWidth = size;
+            canvasHeight = size;
+        }
+
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        // Arena boundaries - circular boundary inside the canvas, adaptive to aspect ratio
+        // Calculate radius based on the smaller dimension to ensure the circle fits
+        let boundaryRadius = Math.min(canvasWidth, canvasHeight) / 2 - Math.max(30, Math.min(canvasWidth, canvasHeight) * 0.08);
+
+        // For very rectangular canvases (like mobile), we might want to adjust the center position
+        // to better utilize space, but keep it centered for now to maintain gameplay balance
+        let boundaryCenter = { x: canvasWidth / 2, y: canvasHeight / 2 };
+        const ballRadius = 15;
+
+        // ============================================
+        // GAME STATE VARIABLES
+        // ============================================
+
+        let balls = [];              // Array of active ball objects
+        let winnerBall = null;       // The winning ball (if any)
+        let lastUpdateTime = 0;      // Timestamp of last frame
+        let running = true;          // Main game loop control
+        let frameId = null;          // Animation frame ID
+        let gameStartTime = null;    // When competitive gameplay began
+        let paused = false;
+        let showingExitConfirmation = false;          // Pause state
+
+        // ============================================
+        // UI ELEMENTS SETUP
+        // ============================================
+
+        const uiContainer = document.createElement('div');
+        uiContainer.id = 'ui-container';
+        uiContainer.className = 'ui-panel';
+        document.body.appendChild(uiContainer);
+
+        // ============================================
+        // BALL CLASS DEFINITION
+        // ============================================
+        // Represents a physics-enabled ball with lines
+        /**
+         * Ball class representing a physics-enabled game entity
+         * Each ball has lines that can be removed by other balls
+         */
+        class Ball {
+            /**
+             * Creates a new ball with random initial velocity
+             * @param {number} x - Initial x position
+             * @param {number} y - Initial y position
+             * @param {number} radius - Ball radius
+             * @param {string} color - Ball color (hex)
+             * @param {number} speed - Initial speed
+             * @param {Object} boundaryCenter - Center point of arena
+             * @param {number} boundaryRadius - Radius of arena boundary
+             */
+            constructor(x, y, radius, color, speed, boundaryCenter, boundaryRadius) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.lines = [];           // Array of line endpoints
+                this.isEliminated = false; // Whether this ball has been eliminated
+                this.boundaryCenter = boundaryCenter;
+                this.boundaryRadius = boundaryRadius;
+
+                // Statistics tracking
+                this.linesLost = 0;        // Lines removed by other balls
+                this.linesTaken = 0;       // Lines taken from other balls
+
+                // Random initial velocity
+                let angle = Math.random() * 2 * Math.PI;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+
+                // Initialize with starting lines
+                for (let i = 0; i < config.linesPerHit; i++) {
+                    this.addLine();
+                }
+            }
+
+            /**
+             * Renders the ball and its lines on the canvas
+             */
+            draw() {
+                if (this.isEliminated) return;
+
+                // Draw lines connecting ball to boundary points
+                this.lines.forEach(line => {
+                    ctx.beginPath();
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(line.end.x, line.end.y);
+                    ctx.stroke();
+                });
+
+                // Draw the ball itself
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+
+            /**
+             * Updates ball position based on velocity
+             * @param {number} deltaTime - Time elapsed since last update
+             */
+            move(deltaTime) {
+                this.x += this.vx * deltaTime;
+                this.y += this.vy * deltaTime;
+            }
+
+            /**
+             * Adds a new line from ball to a random boundary point
+             */
+            addLine() {
+                let angle = Math.random() * 2 * Math.PI;
+                let end = {
+                    x: this.boundaryCenter.x + this.boundaryRadius * Math.cos(angle),
+                    y: this.boundaryCenter.y + this.boundaryRadius * Math.sin(angle)
+                };
+                this.lines.push({ end: end });
+            }
+
+            /**
+             * Checks for collision with arena boundary and handles reflection
+             * @returns {boolean} True if collision occurred
+             */
+            checkBoundaryCollision() {
+                let distFromCenter = Math.hypot(this.x - this.boundaryCenter.x, this.y - this.boundaryCenter.y);
+                if (distFromCenter + this.radius >= this.boundaryRadius) {
+                    let normalX = (this.x - this.boundaryCenter.x) / distFromCenter;
+                    let normalY = (this.y - this.boundaryCenter.y) / distFromCenter;
+                    let dotProduct = this.vx * normalX + this.vy * normalY;
+
+                    this.vx -= 2 * dotProduct * normalX;
+                    this.vy -= 2 * dotProduct * normalY;
+
+                    // Reposition to prevent from getting stuck
+                    let overlap = (distFromCenter + this.radius) - this.boundaryRadius;
+                    this.x -= normalX * overlap;
+                    this.y -= normalY * overlap;
+                    
+                    // Speed increase
+                    let speed = Math.hypot(this.vx, this.vy);
+                    let newSpeed = speed + config.boundarySpeedIncrease;
+                    this.vx = (this.vx / speed) * newSpeed;
+                    this.vy = (this.vy / speed) * newSpeed;
+
+                    // Add multiple lines based on user setting
+                    for (let i = 0; i < config.linesPerHit; i++) {
+                        this.addLine();
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            /**
+             * Checks if this ball intersects with another ball's lines
+             * If intersection detected, removes the line from the other ball
+             * @param {Ball} otherBall - The ball whose lines to check against
+             * @returns {boolean} True if a line was removed
+             */
+            checkLineCollision(otherBall) {
+                for (let i = 0; i < otherBall.lines.length; i++) {
+                    const line = otherBall.lines[i];
+
+                    // Line segment from other ball to boundary point
+                    const lineStart = { x: otherBall.x, y: otherBall.y };
+                    const lineEnd = line.end;
+
+                    // Vector math to find closest point on line segment
+                    const lineVec = { x: lineEnd.x - lineStart.x, y: lineEnd.y - lineStart.y };
+                    const ballVec = { x: this.x - lineStart.x, y: this.y - lineStart.y };
+
+                    const lineLenSq = lineVec.x * lineVec.x + lineVec.y * lineVec.y;
+
+                    // Parameter t represents position along line segment (0-1)
+                    let t = 0;
+                    if (lineLenSq !== 0) {
+                        t = Math.max(0, Math.min(1, (ballVec.x * lineVec.x + ballVec.y * lineVec.y) / lineLenSq));
+                    }
+
+                    // Find closest point on line segment
+                    const closestPoint = {
+                        x: lineStart.x + t * lineVec.x,
+                        y: lineStart.y + t * lineVec.y
+                    };
+
+                    // Check if ball overlaps with closest point
+                    const distSq = (this.x - closestPoint.x) ** 2 + (this.y - closestPoint.y) ** 2;
+
+                    if (distSq <= (this.radius * this.radius)) {
+                        otherBall.lines.splice(i, 1); // Remove the line
+                        otherBall.linesLost++; // Increment lines lost for the victim
+                        this.linesTaken++; // Increment lines taken for the attacker
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        // ============================================
+        // PHYSICS & COLLISION FUNCTIONS
+        // ============================================
+
+        /**
+         * Handles elastic collision between two balls with configurable speed increase
+         * Uses conservation of momentum and energy for realistic physics
+         * @param {Ball} ball1 - First ball in collision
+         * @param {Ball} ball2 - Second ball in collision
+         */
+        function handleBallBallCollision(ball1, ball2) {
+            const dx = ball2.x - ball1.x;
+            const dy = ball2.y - ball1.y;
+            const distance = Math.hypot(dx, dy);
+
+            if (distance < ball1.radius + ball2.radius && distance > 0) {
+                // Separate overlapping balls to prevent sticking
+                const overlap = (ball1.radius + ball2.radius) - distance;
+                const normalX = dx / distance;
+                const normalY = dy / distance;
+                ball1.x -= normalX * (overlap / 2);
+                ball1.y -= normalY * (overlap / 2);
+                ball2.x += normalX * (overlap / 2);
+                ball2.y += normalY * (overlap / 2);
+
+                // Calculate collision response using elastic collision formulas
+                // Split velocities into normal and tangential components
+                const v1n = ball1.vx * normalX + ball1.vy * normalY;
+                const v2n = ball2.vx * normalX + ball2.vy * normalY;
+                const v1t = -ball1.vx * normalY + ball1.vy * normalX;
+                const v2t = -ball2.vx * normalY + ball2.vy * normalX;
+
+                // Exchange normal components (elastic collision)
+                const v1nNew = v2n;
+                const v2nNew = v1n;
+
+                // Reconstruct velocity vectors
+                ball1.vx = v1nNew * normalX - v1t * normalY;
+                ball1.vy = v1nNew * normalY + v1t * normalX;
+                ball2.vx = v2nNew * normalX - v2t * normalY;
+                ball2.vy = v2nNew * normalY + v2t * normalX;
+
+                // Apply speed increase based on configuration
+                const speed1 = Math.hypot(ball1.vx, ball1.vy);
+                const speed2 = Math.hypot(ball2.vx, ball2.vy);
+                const combinedSpeed = speed1 + speed2;
+
+                // Scale velocities to increase total energy
+                ball1.vx = (ball1.vx / speed1) * (speed1 + combinedSpeed * config.collisionSpeedFactor);
+                ball1.vy = (ball1.vy / speed1) * (speed1 + combinedSpeed * config.collisionSpeedFactor);
+                ball2.vx = (ball2.vx / speed2) * (speed2 + combinedSpeed * config.collisionSpeedFactor);
+                ball2.vy = (ball2.vy / speed2) * (speed2 + combinedSpeed * config.collisionSpeedFactor);
+            }
+        }
+
+        // ============================================
+        // GAME MANAGEMENT FUNCTIONS
+        // ============================================
+
+        /**
+         * Main game loop - handles all game updates and rendering
+         * Called repeatedly via requestAnimationFrame
+         * @param {number} timestamp - Current time in milliseconds
+         */
+        function loop(timestamp) {
+            if (!running) {
+                frameId = null;
+                return;
+            }
+
+            // Initialize game start time on first frame
+            if (gameStartTime === null) {
+                gameStartTime = timestamp / 1000;
+            }
+
+            const deltaTime = (timestamp - lastUpdateTime) / 1000;
+            lastUpdateTime = timestamp;
+            const currentTime = timestamp / 1000;
+
+            // Check if we're in grace period
+            const inGracePeriod = (currentTime - gameStartTime) < GRACE_PERIOD_DURATION;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.arc(boundaryCenter.x, boundaryCenter.y, boundaryRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 6;
+            ctx.stroke();
+
+            if (gameState === State.GAMEPLAY) {
+                // Skip physics updates if paused
+                if (!paused) {
+                    for (let i = 0; i < balls.length; i++) {
+                        if (balls[i].isEliminated) continue;
+
+                        balls[i].move(deltaTime);
+                        balls[i].checkBoundaryCollision();
+
+                        // Ball-to-ball collisions
+                        for (let j = i + 1; j < balls.length; j++) {
+                            if (balls[j].isEliminated) continue;
+                            handleBallBallCollision(balls[i], balls[j]);
+                        }
+
+                        // Line interactions: only allow after grace period
+                        if (!inGracePeriod) {
+                            for (let j = 0; j < balls.length; j++) {
+                                if (i === j || balls[j].isEliminated) continue;
+                                balls[i].checkLineCollision(balls[j]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Always render balls and UI elements
+            balls.forEach(ball => ball.draw());
+
+            // Display grace period countdown
+            if (gameState === State.GAMEPLAY && inGracePeriod) {
+                const graceRemaining = GRACE_PERIOD_DURATION - (currentTime - gameStartTime);
+                ctx.fillStyle = '#ffff00';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Peace time remaining: ${graceRemaining.toFixed(1)}s`, boundaryCenter.x, 80);
+            }
+
+            // Display live scoreboard during gameplay
+            if (gameState === State.GAMEPLAY) {
+                renderLiveScoreboard();
+            }
+
+            // Display pause indicator
+            if (paused && !showingExitConfirmation) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSED', boundaryCenter.x, boundaryCenter.y);
+                ctx.font = '18px Arial';
+                ctx.fillText('Press SPACE to resume', boundaryCenter.x, boundaryCenter.y + 50);
+            }
+
+            // Display exit confirmation dialog
+            if (showingExitConfirmation) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Confirmation box
+                const boxWidth = 400;
+                const boxHeight = 200;
+                const boxX = boundaryCenter.x - boxWidth / 2;
+                const boxY = boundaryCenter.y - boxHeight / 2;
+
+                ctx.fillStyle = 'rgba(30, 41, 59, 0.95)';
+                ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+                // Confirmation text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Exit to Menu?', boundaryCenter.x, boundaryCenter.y - 30);
+
+                ctx.font = '16px Arial';
+                ctx.fillText('Your game progress will be lost', boundaryCenter.x, boundaryCenter.y);
+
+                // Instructions
+                ctx.fillStyle = '#cccccc';
+                ctx.font = '14px Arial';
+                const isMobile = window.innerWidth < 768 || window.innerHeight > window.innerWidth;
+const confirmText = isMobile ?
+    'TAP: cancel | ESC: confirm exit' :
+    'Press Y to confirm, N to cancel';
+ctx.fillText(confirmText, boundaryCenter.x, boundaryCenter.y + 40);
+            }
+
+            // Check for elimination and winner
+            let activeBalls = balls.filter(b => b.lines.length > 0);
+            balls.forEach(b => {
+                if (b.lines.length === 0) {
+                    b.isEliminated = true;
+                }
+            });
+
+            activeBalls = balls.filter(b => !b.isEliminated);
+            if (activeBalls.length <= 1 && gameState === State.GAMEPLAY) {
+                if (activeBalls.length === 1) {
+                    winnerBall = activeBalls[0];
+                }
+                gameState = State.STATS;
+                renderStatsScreen();
+            } else if (!paused && !showingExitConfirmation) {
+                frameId = requestAnimationFrame(loop);
+            }
+        }
+
+        /**
+         * Initializes and starts a new game with configured settings
+         */
+        function startGame() {
+            balls = [];
+            winnerBall = null;
+            gameStartTime = null; // Will be set on first loop iteration
+            paused = false;
+            running = true;
+            lastUpdateTime = performance.now(); // Initialize lastUpdateTime
+            let colors = [...BALL_COLORS].sort(() => 0.5 - Math.random());
+            const initialSpeed = config.initialSpeed;
+
+            // Apply boundary radius ratio
+            boundaryRadius = Math.min(canvasWidth, canvasHeight) / 2 - 40;
+            boundaryRadius *= Math.max(0.3, Math.min(1.0, config.boundaryRadiusRatio));
+
+            for (let i = 0; i < config.ballCount; i++) {
+                let x, y, isOverlapping;
+                do {
+                    isOverlapping = false;
+                    let angle = Math.random() * 2 * Math.PI;
+                    let maxDist = boundaryRadius - ballRadius * 3; // Leave more space from boundary
+                    let dist = Math.random() * maxDist * 0.8; // Don't spawn too close to center either
+                    x = boundaryCenter.x + dist * Math.cos(angle);
+                    y = boundaryCenter.y + dist * Math.sin(angle);
+                    
+                    for (const ball of balls) {
+                        if (Math.hypot(x - ball.x, y - ball.y) < ballRadius * 2) {
+                            isOverlapping = true;
+                            break;
+                        }
+                    }
+                } while (isOverlapping);
+
+                const ball = new Ball(x, y, ballRadius, colors[i], initialSpeed, boundaryCenter, boundaryRadius);
+                balls.push(ball);
+            }
+            gameState = State.GAMEPLAY;
+            // Start the game loop with current timestamp
+            loop(performance.now());
+        }
+
+        /**
+         * Renders a live scoreboard showing current ball status
+         * Displays ball colors, line counts, and elimination status
+         */
+        function renderLiveScoreboard() {
+            if (!ctx || balls.length === 0) return;
+
+            // Position scoreboard in the top-right corner of the canvas (responsive sizing)
+            const isMobile = window.innerWidth < 768 || window.innerHeight > window.innerWidth;
+            const scoreboardWidth = isMobile ? 160 : 190; // Smaller on mobile
+            const scoreboardX = canvas.width - scoreboardWidth - 10;
+            const scoreboardY = 20;
+            const lineHeight = isMobile ? 20 : 24; // Smaller line height on mobile
+
+            // Semi-transparent background for readability (responsive sizing)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(scoreboardX - 15, scoreboardY - 10, scoreboardWidth, Math.max(balls.length * lineHeight + 60, 100));
+
+            // Title (responsive sizing)
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${isMobile ? 14 : 16}px Arial`;
+            ctx.textAlign = 'left';
+            ctx.fillText('Live Scoreboard', scoreboardX, scoreboardY);
+
+            // Sort balls by line count (descending) for ranking
+            const sortedBalls = [...balls].sort((a, b) => b.lines.length - a.lines.length);
+
+            sortedBalls.forEach((ball, index) => {
+                const y = scoreboardY + 35 + index * lineHeight;
+
+                // Color indicator square (responsive sizing)
+                ctx.fillStyle = ball.color;
+                const squareSize = isMobile ? 14 : 18;
+                ctx.fillRect(scoreboardX, y - 10, squareSize, squareSize);
+
+                // Ball status text (responsive sizing)
+                ctx.fillStyle = ball.isEliminated ? '#666666' : '#ffffff';
+                ctx.font = `bold ${isMobile ? 12 : 14}px Arial`;
+                const status = ball.isEliminated ? 'ELIMINATED' : `${ball.lines.length} lines`;
+                const textOffset = isMobile ? 20 : 25;
+                ctx.fillText(`Ball ${index + 1}: ${status}`, scoreboardX + textOffset, y + 3);
+            });
+
+            // Control instructions (show different text for mobile)
+            ctx.fillStyle = '#cccccc';
+            ctx.font = `${isMobile ? 10 : 12}px Arial`;
+            const controlsText = isMobile ?
+                'TAP: pause | ESC: exit' :
+                'SPACE: pause | ESC: exit';
+            ctx.fillText(controlsText, scoreboardX, scoreboardY + balls.length * lineHeight + 40);
+        }
+
+        function loop(timestamp) {
+            if (!running) {
+                frameId = null;
+                return;
+            }
+
+            // Initialize game start time on first frame
+            if (gameStartTime === null) {
+                gameStartTime = timestamp / 1000;
+            }
+
+            const deltaTime = (timestamp - lastUpdateTime) / 1000;
+            lastUpdateTime = timestamp;
+            const currentTime = timestamp / 1000;
+
+            // Check if we're in grace period
+            const inGracePeriod = (currentTime - gameStartTime) < GRACE_PERIOD_DURATION;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.arc(boundaryCenter.x, boundaryCenter.y, boundaryRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 6;
+            ctx.stroke();
+
+            if (gameState === State.GAMEPLAY) {
+                for (let i = 0; i < balls.length; i++) {
+                    if (balls[i].isEliminated) continue;
+
+                    balls[i].move(deltaTime);
+                    balls[i].checkBoundaryCollision();
+                    
+                    for (let j = i + 1; j < balls.length; j++) {
+                        if (balls[j].isEliminated) continue;
+                        handleBallBallCollision(balls[i], balls[j]);
+                    }
+
+                    // Line interactions: only allow after grace period
+                    if (!inGracePeriod) {
+                        for (let j = 0; j < balls.length; j++) {
+                            if (i === j || balls[j].isEliminated) continue;
+                            balls[i].checkLineCollision(balls[j]);
+                        }
+                    }
+                }
+            }
+
+            balls.forEach(ball => ball.draw());
+
+            // Display grace period countdown
+            if (gameState === State.GAMEPLAY && inGracePeriod) {
+                const graceRemaining = GRACE_PERIOD_DURATION - (currentTime - gameStartTime);
+                ctx.fillStyle = '#ffff00';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Peace time remaining: ${graceRemaining.toFixed(1)}s`, boundaryCenter.x, 80);
+            }
+
+            // Display live scoreboard during gameplay
+            if (gameState === State.GAMEPLAY) {
+                renderLiveScoreboard();
+            }
+
+            // Display pause indicator
+            if (paused && !showingExitConfirmation) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSED', boundaryCenter.x, boundaryCenter.y);
+                ctx.font = '18px Arial';
+                ctx.fillText('Press SPACE to resume', boundaryCenter.x, boundaryCenter.y + 50);
+            }
+
+            // Display exit confirmation dialog
+            if (showingExitConfirmation) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Confirmation box
+                const boxWidth = 400;
+                const boxHeight = 200;
+                const boxX = boundaryCenter.x - boxWidth / 2;
+                const boxY = boundaryCenter.y - boxHeight / 2;
+
+                ctx.fillStyle = 'rgba(30, 41, 59, 0.95)';
+                ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+                // Confirmation text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Exit to Menu?', boundaryCenter.x, boundaryCenter.y - 30);
+
+                ctx.font = '16px Arial';
+                ctx.fillText('Your game progress will be lost', boundaryCenter.x, boundaryCenter.y);
+
+                // Instructions
+                ctx.fillStyle = '#cccccc';
+                ctx.font = '14px Arial';
+                const isMobile = window.innerWidth < 768 || window.innerHeight > window.innerWidth;
+const confirmText = isMobile ?
+    'TAP: cancel | ESC: confirm exit' :
+    'Press Y to confirm, N to cancel';
+ctx.fillText(confirmText, boundaryCenter.x, boundaryCenter.y + 40);
+            }
+
+            // Check for elimination and winner
+            let activeBalls = balls.filter(b => b.lines.length > 0);
+            balls.forEach(b => {
+                if (b.lines.length === 0) {
+                    b.isEliminated = true;
+                }
+            });
+
+            activeBalls = balls.filter(b => !b.isEliminated);
+            if (activeBalls.length <= 1 && gameState === State.GAMEPLAY) {
+                if (activeBalls.length === 1) {
+                    winnerBall = activeBalls[0];
+                }
+                gameState = State.STATS;
+                renderStatsScreen();
+            } else if (!paused && !showingExitConfirmation) {
+                frameId = requestAnimationFrame(loop);
+            }
+        }
+
+        // ============================================
+        // UI RENDERING FUNCTIONS
+        // ============================================
+
+        /**
+         * Creates an interactive slider control for game settings
+         */
+        function createSlider(label, min, max, value, step, onInput) {
+            const container = document.createElement('div');
+            container.className = 'input-group';
+            const labelEl = document.createElement('span');
+            labelEl.textContent = label;
+            const valueEl = document.createElement('span');
+            valueEl.textContent = value;
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = min;
+            slider.max = max;
+            slider.step = step;
+            slider.value = value;
+            slider.oninput = (e) => {
+                valueEl.textContent = e.target.value;
+                onInput(e.target.value);
+            };
+            container.append(labelEl, slider, valueEl);
+            return container;
+        }
+
+        /**
+         * Renders the interactive setup screen with game configuration options
+         */
+        function renderSetupScreen() {
+            uiContainer.innerHTML = `
+                <h1 class="text-5xl font-bold mb-6 text-blue-400">Vector Balls</h1>
+                <p class="mb-6 text-lg text-gray-300">Configure your game settings</p>
+                <div id="settings-controls" class="flex flex-col gap-4"></div>
+                <button id="startButton" class="mt-6 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all transform hover:scale-105">Start Game</button>
+            `;
+
+            const controls = document.getElementById('settings-controls');
+            
+            const ballCountSlider = createSlider('Number of Balls', 2, 12, config.ballCount, 1, (val) => {
+                config.ballCount = parseInt(val);
+            });
+            controls.appendChild(ballCountSlider);
+            
+            const linesPerHitSlider = createSlider('Lines Added on Boundary Hit', 1, 10, config.linesPerHit, 1, (val) => {
+                config.linesPerHit = parseInt(val);
+            });
+            controls.appendChild(linesPerHitSlider);
+
+            const initialSpeedSlider = createSlider('Initial Ball Speed', 50, 200, config.initialSpeed, 5, (val) => {
+                config.initialSpeed = parseInt(val);
+            });
+            controls.appendChild(initialSpeedSlider);
+
+            const speedFactorSlider = createSlider('Ball Collision Speed Factor', 0, 1, config.collisionSpeedFactor, 0.01, (val) => {
+                config.collisionSpeedFactor = parseFloat(val);
+            });
+            controls.appendChild(speedFactorSlider);
+
+            const boundarySpeedSlider = createSlider('Boundary Speed Increase', 1, 50, config.boundarySpeedIncrease, 1, (val) => {
+                config.boundarySpeedIncrease = parseFloat(val);
+            });
+            controls.appendChild(boundarySpeedSlider);
+
+            const boundaryRadiusSlider = createSlider('Arena Size', 0.3, 1.0, config.boundaryRadiusRatio, 0.1, (val) => {
+                config.boundaryRadiusRatio = parseFloat(val);
+            });
+            controls.appendChild(boundaryRadiusSlider);
+
+            const peacefulTimeSlider = createSlider('Peaceful Time (seconds)', 0.5, 5.0, config.peacefulTimeDuration, 0.5, (val) => {
+                config.peacefulTimeDuration = parseFloat(val);
+                GRACE_PERIOD_DURATION = config.peacefulTimeDuration; // Update the constant
+            });
+            controls.appendChild(peacefulTimeSlider);
+
+            document.getElementById('startButton').onclick = () => {
+                uiContainer.style.display = 'none';
+                startGame();
+            };
+            uiContainer.style.display = 'flex';
+        }
+
+        /**
+         * Renders the end-of-game statistics screen with rankings and navigation
+         */
+        function renderStatsScreen() {
+            uiContainer.innerHTML = '';
+
+            // Winner announcement with trophy emoji
+            const title = document.createElement('h1');
+            title.className = 'text-5xl font-bold mb-6 text-yellow-400';
+            title.textContent = winnerBall ? '🏆 WINNER!' : '🎮 Game Over!';
+            uiContainer.appendChild(title);
+
+            if (winnerBall) {
+                // Winner ball display
+                const winnerDisplay = document.createElement('div');
+                winnerDisplay.className = 'text-center mb-6';
+
+                const winnerColorBox = document.createElement('div');
+                winnerColorBox.className = 'w-20 h-20 rounded-full mx-auto mb-4 border-4 border-yellow-400 shadow-lg';
+                winnerColorBox.style.backgroundColor = winnerBall.color;
+                winnerDisplay.appendChild(winnerColorBox);
+
+                const winnerText = document.createElement('p');
+                winnerText.className = 'text-2xl font-semibold text-white';
+                winnerText.textContent = `Ball #${balls.indexOf(winnerBall) + 1}`;
+                winnerDisplay.appendChild(winnerText);
+
+                uiContainer.appendChild(winnerDisplay);
+            }
+            
+            // Detailed statistics table
+            const statsTable = document.createElement('div');
+            statsTable.className = 'w-full max-w-lg mx-auto bg-gray-800 rounded-lg p-4 border border-gray-600';
+
+            // Table header
+            const headerRow = document.createElement('div');
+            headerRow.className = 'grid grid-cols-5 gap-2 mb-3 pb-2 border-b border-gray-600 text-sm font-semibold text-gray-300';
+            headerRow.innerHTML = `
+                <div>Rank</div>
+                <div>Ball</div>
+                <div class="text-center">Lines Left</div>
+                <div class="text-center">Lines Lost</div>
+                <div class="text-center">Lines Taken</div>
+            `;
+            statsTable.appendChild(headerRow);
+
+            // Sort balls by final lines (descending)
+            balls.sort((a, b) => b.lines.length - a.lines.length);
+
+            balls.forEach((ball, index) => {
+                const row = document.createElement('div');
+                row.className = `grid grid-cols-5 gap-2 py-2 px-1 rounded ${
+                    ball.isEliminated ? 'bg-red-900/30' : 'bg-gray-700/30'
+                }`;
+
+                // Rank with medal for top 3
+                const rankDiv = document.createElement('div');
+                rankDiv.className = 'font-bold text-lg flex items-center';
+                let rankText = `${index + 1}`;
+                if (index === 0 && winnerBall) {
+                    rankText = '🥇';
+                } else if (index === 1 && winnerBall) {
+                    rankText = '🥈';
+                } else if (index === 2) {
+                    rankText = '🥉';
+                }
+                rankDiv.textContent = rankText;
+
+                // Ball color and number
+                const ballDiv = document.createElement('div');
+                ballDiv.className = 'flex items-center gap-2';
+                const colorBox = document.createElement('div');
+                colorBox.className = 'w-6 h-6 rounded-full border border-white';
+                colorBox.style.backgroundColor = ball.color;
+                const ballNumber = document.createElement('span');
+                ballNumber.className = 'text-sm font-medium';
+                ballNumber.textContent = `#${balls.indexOf(ball) + 1}`;
+                ballDiv.appendChild(colorBox);
+                ballDiv.appendChild(ballNumber);
+
+                // Lines remaining
+                const linesLeftDiv = document.createElement('div');
+                linesLeftDiv.className = 'text-center font-semibold';
+                linesLeftDiv.textContent = ball.lines.length;
+
+                // Lines lost
+                const linesLostDiv = document.createElement('div');
+                linesLostDiv.className = 'text-center text-red-400';
+                linesLostDiv.textContent = ball.linesLost;
+
+                // Lines taken
+                const linesTakenDiv = document.createElement('div');
+                linesTakenDiv.className = 'text-center text-green-400';
+                linesTakenDiv.textContent = ball.linesTaken;
+
+                row.appendChild(rankDiv);
+                row.appendChild(ballDiv);
+                row.appendChild(linesLeftDiv);
+                row.appendChild(linesLostDiv);
+                row.appendChild(linesTakenDiv);
+
+                statsTable.appendChild(row);
+            });
+
+            uiContainer.appendChild(statsTable);
+
+            // Navigation buttons
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'mt-6 flex flex-col gap-3 items-center';
+
+            const newGameButton = document.createElement('button');
+            newGameButton.className = 'bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all transform hover:scale-105';
+            newGameButton.textContent = '🎮 New Game (N)';
+            newGameButton.onclick = () => {
+                uiContainer.style.display = 'none';
+                startGame();
+            };
+            buttonContainer.appendChild(newGameButton);
+
+            const setupButton = document.createElement('button');
+            setupButton.className = 'bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all transform hover:scale-105';
+            setupButton.textContent = '⚙️ Setup Menu (R)';
+            setupButton.onclick = () => {
+                uiContainer.style.display = 'none';
+                renderSetupScreen();
+            };
+            buttonContainer.appendChild(setupButton);
+
+            uiContainer.appendChild(buttonContainer);
+
+            // Keyboard shortcuts hint
+            const shortcutsHint = document.createElement('p');
+            shortcutsHint.className = 'mt-4 text-sm text-gray-400 text-center';
+            shortcutsHint.textContent = '💡 Keyboard shortcuts: N = New Game, R or ESC = Setup Menu';
+            uiContainer.appendChild(shortcutsHint);
+
+            uiContainer.style.display = 'flex';
+        }
+
+        // ============================================
+        // INPUT HANDLING
+        // ============================================
+
+        // Global keyboard event listeners for game controls
+        document.addEventListener('keydown', (e) => {
+            // Pause/Resume during gameplay
+            if (e.code === 'Space' && gameState === State.GAMEPLAY) {
+                e.preventDefault();
+                paused = !paused;
+                if (!paused) {
+                    // Resume the game loop
+                    lastUpdateTime = performance.now();
+                    frameId = requestAnimationFrame(loop);
+                }
+            }
+            // Exit to menu during gameplay (with confirmation)
+            else if (e.code === 'Escape' && gameState === State.GAMEPLAY) {
+                e.preventDefault();
+                if (!showingExitConfirmation) {
+                    showingExitConfirmation = true;
+                    paused = true; // Pause the game while showing confirmation
+                }
+            }
+            // Handle confirmation dialog responses
+            else if (showingExitConfirmation && gameState === State.GAMEPLAY) {
+                if (e.code === 'KeyY' || e.code === 'Enter') {
+                    // Yes - exit to menu
+                    e.preventDefault();
+                    showingExitConfirmation = false;
+                    paused = false;
+                    gameState = State.SETUP;
+                    renderSetupScreen();
+                } else if (e.code === 'KeyN' || e.code === 'Escape') {
+                    // No - cancel exit
+                    e.preventDefault();
+                    showingExitConfirmation = false;
+                    paused = false;
+                    // Resume the game
+                    lastUpdateTime = performance.now();
+                    frameId = requestAnimationFrame(loop);
+                }
+            }
+            // Return to setup from stats screen
+            else if ((e.code === 'KeyR' || e.code === 'Escape') && gameState === State.STATS) {
+                e.preventDefault();
+                uiContainer.style.display = 'none';
+                renderSetupScreen();
+            }
+            // Quick restart from stats screen
+            else if (e.code === 'KeyN' && gameState === State.STATS) {
+                e.preventDefault();
+                uiContainer.style.display = 'none';
+                startGame();
+            }
+        });
+
+        // ============================================
+        // GAME INITIALIZATION
+        // ============================================
+
+        // Handle window resize for responsive design
+        window.addEventListener('resize', () => {
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const isMobile = viewportWidth < 768 || viewportHeight > viewportWidth;
+
+            let newCanvasWidth, newCanvasHeight;
+
+            if (isMobile) {
+                // Mobile/Portrait: Use available space efficiently for vertical screens
+                newCanvasWidth = Math.min(viewportWidth * 0.95, 600);
+                newCanvasHeight = Math.min(viewportHeight * 0.85, newCanvasWidth * 1.5);
+
+                // Ensure minimum playable size
+                const minSize = 300;
+                newCanvasWidth = Math.max(newCanvasWidth, minSize);
+                newCanvasHeight = Math.max(newCanvasHeight, minSize);
+            } else {
+                // Desktop/Landscape: Use balanced approach
+                const size = Math.min(viewportWidth * 0.8, viewportHeight * 0.85, 900);
+                newCanvasWidth = size;
+                newCanvasHeight = size;
+            }
+
+            // Only update if dimensions have actually changed significantly
+            const sizeChanged = Math.abs(canvas.width - newCanvasWidth) > 10 || Math.abs(canvas.height - newCanvasHeight) > 10;
+
+            if (sizeChanged) {
+                // Update canvas dimensions
+                canvas.width = newCanvasWidth;
+                canvas.height = newCanvasHeight;
+
+                // Update boundary calculations
+                boundaryRadius = Math.min(newCanvasWidth, newCanvasHeight) / 2 - Math.max(30, Math.min(newCanvasWidth, newCanvasHeight) * 0.08);
+                boundaryCenter = { x: newCanvasWidth / 2, y: newCanvasHeight / 2 };
+
+                // Re-render the current screen
+                if (gameState === State.SETUP) {
+                    renderSetupScreen();
+                } else if (gameState === State.STATS) {
+                    renderStatsScreen();
+                }
+                // During gameplay, the next frame will use the new dimensions automatically
+            }
+        });
+
+        // Touch/Mobile controls
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === State.GAMEPLAY && !showingExitConfirmation) {
+                // Touch to pause/resume on mobile
+                paused = !paused;
+                if (!paused) {
+                    lastUpdateTime = performance.now();
+                    frameId = requestAnimationFrame(loop);
+                }
+            }
+        });
+
+        canvas.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (gameState === State.GAMEPLAY && !showingExitConfirmation) {
+                // Click to pause/resume on desktop
+                paused = !paused;
+                if (!paused) {
+                    lastUpdateTime = performance.now();
+                    frameId = requestAnimationFrame(loop);
+                }
+            }
+        });
+
+        // Start the game by showing the setup screen
+        renderSetupScreen();
+
+    </script>
+</body>
+</html>
