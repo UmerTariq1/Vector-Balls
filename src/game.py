@@ -11,10 +11,10 @@ from typing import List, Optional
 import pygame
 from pygame.math import Vector2
 
-import config
-import physics
-from ball import Ball
-from settings import Settings
+import src.config as config
+import src.physics as physics
+from src.ball import Ball
+from src.settings import Settings
 
 
 class Game:

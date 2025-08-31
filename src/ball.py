@@ -11,9 +11,9 @@ from typing import List
 import pygame
 from pygame.math import Vector2
 
-import config
-from physics import reflect
-from settings import Settings
+import src.config as config
+from src.physics import reflect
+from src.settings import Settings
 
 
 class Ball:

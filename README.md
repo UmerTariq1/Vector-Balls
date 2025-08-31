@@ -4,6 +4,8 @@ A fast-paced, real-time 2D physics-based survival game built with Python and Pyg
 
 ## 🎮 Game Description
 
+![Game Screenshot](imgs/game.png)
+
 Vector Balls is a competitive physics simulation where players control colored balls that move within a circular arena. The objective is to be the last ball remaining by strategically removing other balls' lines while protecting your own.
 
 ## ✨ Features
@@ -66,6 +68,8 @@ Vector Balls is a competitive physics simulation where players control colored b
    - Boundary collision speed increase
    - Arena size percentage (30-100%)
    - Select unique colors for each ball
+
+   ![Setup Menu](imgs/menu.png)
 
 3. Click "Start" to begin gameplay
 
@@ -147,6 +151,8 @@ The game offers extensive customization through the setup screen:
 
 At the end of each game, view comprehensive statistics on a clean, separate screen:
 
+![Stats Screen](imgs/stats.png)
+
 ### Rankings System
 - **🏆 1st Place**: Winner with trophy emoji and gold color
 - **🥈 2nd Place**: Silver medal
@@ -168,12 +174,14 @@ At the end of each game, view comprehensive statistics on a clean, separate scre
 ## 🛠️ Technical Details
 
 ### Architecture
-- **main.py**: Entry point, setup UI, quit confirmation, and main game loop
-- **game.py**: Game state management, rendering, and grace period logic
-- **ball.py**: Ball entity with physics and line management
-- **physics.py**: Collision detection, color matching, and physics utilities
-- **config.py**: Global constants, color palette, and default settings
-- **settings.py**: Runtime configuration management
+- **main.py**: Simple entry point that initializes the game manager
+- **src/game_manager.py**: Main game orchestration and session management
+- **src/ui.py**: User interface components (InputBox, settings screen, quit confirmation)
+- **src/game.py**: Game state management, rendering, and grace period logic
+- **src/ball.py**: Ball entity with physics and line management
+- **src/physics.py**: Collision detection, color matching, and physics utilities
+- **src/config.py**: Global constants, color palette, and default settings
+- **src/settings.py**: Runtime configuration management
 
 ### Key Technologies
 - **Pygame**: 2D graphics, input handling, and game framework
@@ -186,7 +194,7 @@ At the end of each game, view comprehensive statistics on a clean, separate scre
 
 ### Color Management
 - **Current Palette**: 12 optimized colors (Red, Green, Blue, Yellow, Magenta, Cyan, Orange, Purple, Gold, Hot Pink, Navy Blue, Dark Magenta)
-- **Adding Colors**: Modify both `COLORS` in `config.py` and `COLOR_NAMES` in `physics.py` to maintain synchronization
+- **Adding Colors**: Modify both `COLORS` in `src/config.py` and `COLOR_NAMES` in `src/physics.py` to maintain synchronization
 - **Color Matching**: Physics engine automatically finds closest color name for stats display
 
 ### Game Parameters
@@ -194,11 +202,11 @@ At the end of each game, view comprehensive statistics on a clean, separate scre
 - **Arena Size**: 30-100% of default (default: 75%)
 - **Lines per Hit**: 1-10 lines added on boundary collision (default: 3)
 - **Speed Factors**: Collision speed increases (default: 0.12 for ball-ball, 25.0 for boundary)
-- **Grace Period**: 1-second safety period (configurable in `config.py`)
+- **Grace Period**: 1-second safety period (configurable in `src/config.py`)
 
 ### Physics Tuning
 ```python
-# Key values in config.py
+# Key values in src/config.py
 BALL_COLLISION_SPEED_INCREASE_FACTOR = 0.12
 BOUNDARY_COLLISION_SPEED_INCREASE = 25.0
 GRACE_PERIOD_DURATION = 1.0
@@ -207,7 +215,7 @@ INITIAL_SPEED_MAX = 240.0
 ```
 
 ### UI Customization
-- **Fonts**: Modify `FONT_NAME` in `config.py`
+- **Fonts**: Modify `FONT_NAME` in `src/config.py`
 - **Colors**: Update background and UI element colors
 - **Layout**: Adjust button positions and spacing in setup screen
 

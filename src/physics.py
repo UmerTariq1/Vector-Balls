@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from pygame.math import Vector2
 
-import config
+import src.config as config
 
 # Color names mapped to RGB tuples for closest match (same as config.py COLORS)
 COLOR_NAMES = {

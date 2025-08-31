@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Tuple
 
-import config
+import src.config as config
 
 
 Color = Tuple[int, int, int]
