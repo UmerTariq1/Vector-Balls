@@ -3,9 +3,6 @@
 A fast-paced, real-time 2D physics-based survival game built with Python and Pygame, with web browser support.
 
 [![Play Web Version](https://img.shields.io/badge/Play-Web%20Version-FF6B35?style=for-the-badge&logo=firefox&logoColor=white)](https://umertariq1.github.io/Vector-Balls/)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
-[![Pygame](https://img.shields.io/badge/Pygame-2.x-3776AB?style=flat&logo=python&logoColor=white)](https://pygame.org)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 
 ## 🎮 Game Description
 
