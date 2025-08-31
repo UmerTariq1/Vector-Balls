@@ -1,12 +1,21 @@
 # Vector Balls
 
-A fast-paced, real-time 2D physics-based survival game built with Python and Pygame.
+A fast-paced, real-time 2D physics-based survival game built with Python and Pygame, with web browser support.
+
+[![Play Web Version](https://img.shields.io/badge/Play-Web%20Version-FF6B35?style=for-the-badge&logo=firefox&logoColor=white)](https://umertariq1.github.io/Vector-Balls/)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
+[![Pygame](https://img.shields.io/badge/Pygame-2.x-3776AB?style=flat&logo=python&logoColor=white)](https://pygame.org)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 
 ## 🎮 Game Description
 
 <img src="imgs/game.png" alt="Game Screenshot" width="75%" style="max-width: 600px;">
 
 Vector Balls is a competitive physics simulation where players control colored balls that move within a circular arena. The objective is to be the last ball remaining by strategically removing other balls' lines while protecting your own.
+
+**Available in two formats**: Desktop application (Python/Pygame) and web browser version for instant play.
+
+
 
 ## ✨ Features
 
@@ -22,7 +31,7 @@ Vector Balls is a competitive physics simulation where players control colored b
 - **Multiple Exit Options**: Exit buttons available in setup menu and stats screen
 - **Customizable Settings**: Configure ball count (2-12), colors, arena size, and collision parameters
 
-## 🚀 Installation
+## 🚀 Desktop Installation
 
 ### Prerequisites
 - Python 3.11 or higher
@@ -52,22 +61,41 @@ Vector Balls is a competitive physics simulation where players control colored b
    pip install -r requirements.txt
    ```
 
+## 🌐 Web Version
+
+For quick access without installation, you can play the web-converted version at:
+**https://umertariq1.github.io/Vector-Balls/**
+
+### ⚠️ Important Notes:
+- This web version is converted from the original Python desktop application
+- **Mobile Experience**: Due to the conversion process, mobile layouts and touch interactions may not be fully optimized
+- **Desktop Recommended**: For the best experience, use this web version on desktop browsers
+- **Feature Parity**: All core gameplay mechanics are preserved, though some UI elements may differ slightly
+
+If you prefer the full desktop experience with all optimizations, follow the installation steps above.
+
 ## 🎯 How to Play
 
 ### Starting the Game
 
+#### Desktop Version
 1. Run the game:
    ```bash
    python main.py
    ```
 
+#### Web Version
+1. Visit: **https://umertariq1.github.io/Vector-Balls/**
+2. Click "Start Game" to begin
+
 2. **Setup Screen**: Configure your game settings:
    - Number of balls (2-12)
    - Lines added per boundary hit (1-10)
+   - Initial ball speed (50-200)
    - Ball-ball collision speed increase factor
    - Boundary collision speed increase
    - Arena size percentage (30-100%)
-   - Select unique colors for each ball
+   - Peaceful time duration (0.5-5.0 seconds)
 
    <img src="imgs/menu.png" alt="Setup Menu" width="75%" style="max-width: 600px;">
 
@@ -75,19 +103,29 @@ Vector Balls is a competitive physics simulation where players control colored b
 
 ### Controls
 
-#### During Gameplay
+#### Desktop Version
+**During Gameplay:**
 - **Spacebar**: Pause/Resume gameplay anytime
 - **ESC**: Show quit confirmation dialog (returns to menu if confirmed)
-- **R**: Return to setup menu (only when game is over)
 
-#### Setup Menu
+**Setup Menu:**
 - **Mouse**: Click settings, color picker, Start/Exit buttons
 - **ESC**: Exit the application
 - **Enter**: Confirm selections
 
-#### Stats Screen
+**Stats Screen:**
 - **R**: Return to setup menu
 - **Mouse**: Click Exit Game button to quit application
+
+#### Web Version
+**During Gameplay:**
+- **Spacebar**: Pause/Resume gameplay
+- **ESC**: Show quit confirmation dialog
+- **Touch/Click**: Pause/Resume on mobile devices
+
+**All Screens:**
+- **Mouse/Touch**: Click all interactive elements
+- **Keyboard**: Same controls as desktop version
 
 ### Gameplay Mechanics
 
@@ -221,11 +259,19 @@ INITIAL_SPEED_MAX = 240.0
 
 ## 🔧 System Requirements
 
+### Desktop Version
 - **OS**: Windows 10+, macOS 10.12+, Linux
 - **Python**: 3.11 or higher
 - **RAM**: 512MB minimum
 - **Display**: 1024x768 minimum resolution
 - **Input**: Mouse and keyboard required
+
+### Web Version
+- **Browser**: Modern web browser (Chrome, Firefox, Safari, Edge)
+- **JavaScript**: Enabled (required for gameplay)
+- **Display**: 800x600 minimum resolution
+- **Input**: Mouse, keyboard, or touch input
+- **Connection**: Internet connection for initial load
 
 ## 🎮 Tips & Strategies
 
@@ -246,9 +292,16 @@ INITIAL_SPEED_MAX = 240.0
 
 ## 🐛 Troubleshooting
 
+### Desktop Version
 - **Emojis not showing**: Some systems may not display emoji characters in game text
 - **Color similarity**: If colors appear too similar, they can be manually reselected in setup
 - **Performance issues**: Reduce ball count or arena size for better performance
+
+### Web Version
+- **Mobile display issues**: Use desktop browser for best experience, as mobile layouts may not be fully optimized
+- **Slow loading**: Ensure stable internet connection for initial game load
+- **Touch controls**: On mobile devices, tap the screen to pause/resume gameplay
+- **Browser compatibility**: Use modern browsers like Chrome, Firefox, or Safari for best performance
 
 ## 📄 License
 
